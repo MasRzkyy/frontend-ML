@@ -40,16 +40,48 @@ export default function NaiveBayesInputPage() {
     alcohol: "",
   });
 
+  const [masterInput, setMasterInput] = useState("");
+
   const [result, setResult] = useState<null | {
     prediksi: number;
     kelas: string;
     akurasi_model: number;
+    precision: string;
+    recall: string;
+    f1_score: string;
   }>(null);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleMasterFill = () => {
+    const values = masterInput.split(",").map((v) => v.trim());
+
+    if (values.length !== 11) {
+      setError("Master input harus berisi 11 nilai dipisahkan koma.");
+      return;
+    }
+
+    const mappedForm: WineForm = {
+      fixed_acidity: values[0],
+      volatile_acidity: values[1],
+      citric_acid: values[2],
+      residual_sugar: values[3],
+      chlorides: values[4],
+      free_sulfur_dioxide: values[5],
+      total_sulfur_dioxide: values[6],
+      density: values[7],
+      pH: values[8],
+      sulphates: values[9],
+      alcohol: values[10],
+    };
+
+    setForm(mappedForm);
+    setError(null);
   };
 
   const handlePredict = async () => {
@@ -58,12 +90,12 @@ export default function NaiveBayesInputPage() {
     setResult(null);
 
     try {
-      const response = await fetch("http://127.0.0.1:5000/api/predict-nb", {
+      const response = await fetch("https://backend-machine-learning.vercel.app/api/predict-nb", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
-          ph: form.pH, // mapping pH
+          ph: form.pH,
         }),
       });
 
@@ -75,6 +107,9 @@ export default function NaiveBayesInputPage() {
           prediksi: data.prediksi,
           kelas: data.kelas,
           akurasi_model: data.akurasi_model,
+          precision: data.precision,
+          recall: data.recall,
+          f1_score: data.f1_score,
         });
       } else {
         throw new Error(data.error || "Unknown backend error");
@@ -101,6 +136,7 @@ export default function NaiveBayesInputPage() {
       sulphates: "",
       alcohol: "",
     });
+    setMasterInput("");
     setResult(null);
     setError(null);
   };
@@ -121,12 +157,38 @@ export default function NaiveBayesInputPage() {
           Naive Bayes – Wine Quality Prediction
         </h1>
         <p className="mb-6 text-gray-600">
-          Fill out the values below to predict wine quality using the Naive Bayes model.
+          Masukkan 11 fitur wine, atau gunakan master input.
         </p>
 
         <div className="bg-white shadow rounded-xl p-6 border-2 border-black">
-          <h2 className="text-lg font-semibold mb-4 text-gray-700">Wine Characteristics</h2>
+          <h2 className="text-lg font-semibold mb-4 text-gray-700">
+            Wine Characteristics
+          </h2>
 
+          {/* MASTER INPUT */}
+          <div className="mb-4">
+            <label className="mb-1 text-sm font-medium text-black">
+              Master Input (pisahkan dengan koma)
+            </label>
+
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={masterInput}
+                onChange={(e) => setMasterInput(e.target.value)}
+                className="border rounded-lg p-2 w-full text-gray-600 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                placeholder="Contoh: 7.4, 0.7, 0.0, 1.9, 0.076, 11, 34, 0.9978, 3.51, 0.56, 9.4"
+              />
+              <button
+                onClick={handleMasterFill}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+              >
+                Convert
+              </button>
+            </div>
+          </div>
+
+          {/* FORM INPUT */}
           <div className="grid grid-cols-2 gap-4">
             {Object.keys(form).map((field) => (
               <div key={field} className="flex flex-col">
@@ -140,7 +202,6 @@ export default function NaiveBayesInputPage() {
                   value={form[field as keyof WineForm]}
                   onChange={handleChange}
                   className="border rounded-lg p-2 text-gray-600 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  placeholder={`Input ${field.replace(/_/g, " ")}`}
                 />
               </div>
             ))}
@@ -151,7 +212,7 @@ export default function NaiveBayesInputPage() {
               className="px-6 py-2 border rounded-lg text-gray-700 hover:bg-gray-100"
               onClick={handleReset}
             >
-              Draft
+              Reset
             </button>
             <button
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -163,14 +224,14 @@ export default function NaiveBayesInputPage() {
           </div>
         </div>
 
-        {/* Loading Animation */}
+        {/* LOADING */}
         {loading && (
           <div className="mt-6 p-4 bg-yellow-100 text-yellow-800 rounded-lg animate-pulse">
             Predicting... please wait
           </div>
         )}
 
-        {/* Result Popup */}
+        {/* RESULT POPUP */}
         <AnimatePresence>
           {result && (
             <motion.div
@@ -179,11 +240,32 @@ export default function NaiveBayesInputPage() {
               exit={{ opacity: 0, y: -50 }}
               className="fixed top-30 left-1/2 -translate-x-1/2 bg-white border shadow-lg rounded-xl p-6 w-96 z-50"
             >
-              <h2 className="text-lg font-bold mb-2 text-gray-800">Prediction Result</h2>
-              <p className="mb-2 text-gray-600">Prediksi: {result.prediksi}</p>
-              <p className="mb-2 text-gray-600">Kelas: {result.kelas}</p>
-              <p className="mb-4 text-gray-600">Akurasi: {result.akurasi_model}</p>
+              <h2 className="text-lg font-bold mb-2 text-gray-800">
+                Prediction Result
+              </h2>
 
+              <p className="text-gray-700">
+                Prediksi: <b>{result.prediksi}</b>
+              </p>
+              <p className="text-gray-700">
+                Kelas: <b>{result.kelas}</b>
+              </p>
+
+              <p className="text-gray-700 mt-2">
+                Akurasi Model: <b>{result.akurasi_model}</b>
+              </p>
+
+              <p className="text-gray-700">
+                Precision: <b>{result.precision}</b>
+              </p>
+              <p className="text-gray-700">
+                Recall: <b>{result.recall}</b>
+              </p>
+              <p className="text-gray-700">
+                F1-Score: <b>{result.f1_score}</b>
+              </p>
+
+              {/* PIE CHART */}
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
                   <Pie
@@ -193,13 +275,22 @@ export default function NaiveBayesInputPage() {
                     cx="50%"
                     cy="50%"
                     outerRadius={60}
-                    label={(entry) => `${entry.name}: ${entry.value.toFixed(2)}`}
+                    label={(entry) =>
+                      `${entry.name}: ${(entry.value * 100).toFixed(2)}%`
+                    }
                   >
                     {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => value.toFixed(4)} />
+                  <Tooltip
+                    formatter={(value: number) =>
+                      `${(value * 100).toFixed(2)}%`
+                    }
+                  />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
@@ -216,7 +307,6 @@ export default function NaiveBayesInputPage() {
           )}
         </AnimatePresence>
 
-        {/* Error */}
         {error && (
           <div className="mt-6 p-4 bg-red-100 text-red-800 rounded-lg">
             Error: {error}
